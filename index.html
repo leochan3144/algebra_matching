@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algebra Match-Up</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Fredoka+One&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX for Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdfa; /* Tailwind teal-50 */
+            touch-action: manipulation;
+        }
+        .heading-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        
+        .card {
+            transition: all 0.2s ease-in-out;
+            min-height: 80px; /* Ensure uniform height for fractions */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card:hover:not(.disabled):not(.selected):not(.matched) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .selected {
+            border-color: #3b82f6 !important; /* Blue-500 */
+            background-color: #eff6ff !important; /* Blue-50 */
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3) !important;
+            transform: scale(1.02);
+        }
+        .matched {
+            border-color: #22c55e !important; /* Green-500 */
+            background-color: #dcfce7 !important; /* Green-50 */
+            color: #166534 !important; /* Green-800 */
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        
+        @keyframes shake-red {
+            0%, 100% { transform: translateX(0); background-color: #fef2f2; border-color: #ef4444; color: #991b1b; }
+            20%, 60% { transform: translateX(-5px); background-color: #fee2e2; border-color: #ef4444; }
+            40%, 80% { transform: translateX(5px); background-color: #fee2e2; border-color: #ef4444; }
+        }
+        .error-shake {
+            animation: shake-red 0.5s ease-in-out;
+        }
+
+        @keyframes pop-green {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); background-color: #bbf7d0; }
+            100% { transform: scale(1); }
+        }
+        .success-pop {
+            animation: pop-green 0.4s ease-out;
+        }
+
+        /* Adjust KaTeX display math margin for cards */
+        .katex-display {
+            margin: 0 !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative text-slate-800">
+
+    <header class="w-full bg-white shadow-sm py-4 px-4 md:px-12 flex flex-col md:flex-row justify-between items-center z-10 gap-4">
+        <h1 class="text-3xl heading-font text-teal-600">Algebra Match-Up</h1>
+        <div class="flex gap-4 md:gap-6 text-sm md:text-lg font-semibold bg-slate-100 py-2 px-4 md:px-6 rounded-full border border-slate-200 shadow-inner">
+            <div class="flex items-center gap-2">
+                <span class="text-slate-500">Score:</span>
+                <span id="scoreDisplay" class="text-blue-600 font-bold text-xl md:text-2xl w-10 md:w-12 text-center">0</span>
+            </div>
+            <div class="w-px bg-slate-300"></div>
+            <div class="flex items-center gap-2">
+                <span class="text-slate-500">Mistakes:</span>
+                <span id="mistakeDisplay" class="text-red-500 font-bold text-xl md:text-2xl w-6 md:w-8 text-center">0</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-6 md:py-8 max-w-5xl flex flex-col items-center justify-start">
+        <p class="text-center text-slate-600 mb-6 max-w-2xl bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-100 text-sm md:text-base">
+            Match the expression on the left with its description on the right. 
+            Get all 8 correct without a mistake for a <strong>+20 Point Bonus</strong>!
+        </p>
+        
+        <div class="w-full flex flex-col md:flex-row justify-between gap-6 md:gap-12 relative">
+            
+            <!-- Column A: Expressions -->
+            <div class="w-full md:w-1/2 flex flex-col gap-3">
+                <h2 class="text-center font-bold text-xl text-teal-700 mb-2">Expressions</h2>
+                <div id="columnA" class="flex flex-col gap-3">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- VS Badge -->
+            <div class="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-0 opacity-10">
+                <span class="heading-font text-8xl text-slate-400">VS</span>
+            </div>
+
+            <!-- Column B: Descriptions -->
+            <div class="w-full md:w-1/2 flex flex-col gap-3">
+                <h2 class="text-center font-bold text-xl text-teal-700 mb-2">Descriptions</h2>
+                <div id="columnB" class="flex flex-col gap-3">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+        
+        <button onclick="initGame()" class="mt-8 text-teal-600 font-semibold hover:text-teal-800 underline decoration-2 underline-offset-4 transition-colors">
+            ↻ Refresh Questions
+        </button>
+    </main>
+
+    <div id="gameOverModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300 px-4">
+        <div class="bg-white rounded-3xl p-8 md:p-12 max-w-md w-full shadow-2xl transform scale-95 transition-transform duration-300 text-center relative overflow-hidden">
+            <div class="absolute -top-16 -right-16 w-32 h-32 bg-teal-100 rounded-full opacity-50"></div>
+            <div class="absolute -bottom-16 -left-16 w-32 h-32 bg-blue-100 rounded-full opacity-50"></div>
+            
+            <h2 class="heading-font text-4xl text-teal-600 mb-2 relative z-10">Game Over!</h2>
+            <div id="perfectBonusBadge" class="hidden bg-yellow-100 text-yellow-700 font-bold py-1 px-3 rounded-full text-sm inline-block mb-4 relative z-10 border border-yellow-300">
+                ⭐ Perfect Game Bonus! (+20 pts)
+            </div>
+            
+            <div class="my-6 relative z-10">
+                <p class="text-slate-500 font-semibold uppercase tracking-wider text-sm mb-1">Final Score</p>
+                <div id="finalScore" class="text-6xl font-black text-blue-600 mb-4 heading-font">100</div>
+                
+                <p class="text-slate-500 font-semibold uppercase tracking-wider text-sm mb-1 mt-6">Your Rank</p>
+                <div id="finalRank" class="text-2xl font-bold text-slate-800">Master Mathematician</div>
+            </div>
+            
+            <button onclick="initGame()" class="relative z-10 mt-6 bg-gradient-to-r from-teal-500 to-blue-500 hover:from-teal-600 hover:to-blue-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all w-full text-lg">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Large pool of 20+ questions for randomization
+        const questionPool = [
+            { latex: "3(x - 4)", desc: "Subtract 4 from x, then multiply by 3" },
+            { latex: "3x - 4", desc: "Multiply x by 3, then subtract 4" },
+            { latex: "\\frac{x}{5} + 2", desc: "Divide x by 5, then add 2" },
+            { latex: "\\frac{x + 2}{5}", desc: "Add 2 to x, then divide by 5" },
+            { latex: "(2x)^2", desc: "Multiply x by 2, then square the result" },
+            { latex: "2x^2", desc: "Square x, then multiply by 2" },
+            { latex: "x^2 + 7", desc: "Square x, then add 7" },
+            { latex: "(x + 7)^2", desc: "Add 7 to x, then square the result" },
+            { latex: "\\frac{x^2}{3}", desc: "Square x, then divide by 3" },
+            { latex: "\\left(\\frac{x}{3}\\right)^2", desc: "Divide x by 3, then square the result" },
+            { latex: "5(x + 1)", desc: "Add 1 to x, then multiply by 5" },
+            { latex: "5x + 1", desc: "Multiply x by 5, then add 1" },
+            { latex: "\\frac{x - 3}{2}", desc: "Subtract 3 from x, then divide by 2" },
+            { latex: "\\frac{x}{2} - 3", desc: "Divide x by 2, then subtract 3" },
+            { latex: "4x^3", desc: "Cube x, then multiply by 4" },
+            { latex: "(4x)^3", desc: "Multiply x by 4, then cube the result" },
+            { latex: "2(x^2 + 1)", desc: "Square x, add 1, then multiply by 2" },
+            { latex: "2x^2 + 1", desc: "Square x, multiply by 2, then add 1" },
+            { latex: "\\frac{3x}{4}", desc: "Multiply x by 3, then divide by 4" },
+            { latex: "\\sqrt{x + 4}", desc: "Add 4 to x, then take the square root" },
+            { latex: "\\sqrt{x} + 4", desc: "Take the square root of x, then add 4" },
+            { latex: "10 - x", desc: "Subtract x from 10" },
+            { latex: "x - 10", desc: "Subtract 10 from x" }
+        ];
+
+        let score = 0;
+        let mistakes = 0;
+        let matchesFound = 0;
+        let selectedA = null; // { id, element }
+        let selectedB = null; // { id, element }
+        let isProcessing = false;
+        let currentPairs = [];
+        const TOTAL_PAIRS = 8;
+
+        const columnAContainer = document.getElementById('columnA');
+        const columnBContainer = document.getElementById('columnB');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const mistakeDisplay = document.getElementById('mistakeDisplay');
+        const gameOverModal = document.getElementById('gameOverModal');
+        
+        // Fisher-Yates shuffle
+        function shuffleArray(array) {
+            const newArr = [...array];
+            for (let i = newArr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+            }
+            return newArr;
+        }
+
+        function initGame() {
+            // Wait for KaTeX to be loaded before initializing
+            if (typeof katex === 'undefined') {
+                setTimeout(initGame, 100);
+                return;
+            }
+
+            score = 0;
+            mistakes = 0;
+            matchesFound = 0;
+            selectedA = null;
+            selectedB = null;
+            isProcessing = false;
+            
+            updateScoreUI();
+            hideModal();
+
+            // Select 8 random pairs from the pool
+            const shuffledPool = shuffleArray(questionPool);
+            const selectedPool = shuffledPool.slice(0, TOTAL_PAIRS);
+            
+            // Assign unique IDs to the selected pairs for this round
+            currentPairs = selectedPool.map((item, index) => ({
+                id: index,
+                latex: item.latex,
+                desc: item.desc
+            }));
+
+            // Shuffle separately for columns
+            const shuffledA = shuffleArray(currentPairs);
+            const shuffledB = shuffleArray(currentPairs);
+
+            columnAContainer.innerHTML = '';
+            columnBContainer.innerHTML = '';
+
+            // Render columns
+            shuffledA.forEach(pair => {
+                const el = createCard(pair.id, pair.latex, 'A');
+                columnAContainer.appendChild(el);
+            });
+
+            shuffledB.forEach(pair => {
+                const el = createCard(pair.id, pair.desc, 'B');
+                columnBContainer.appendChild(el);
+            });
+        }
+
+        function createCard(id, content, columnType) {
+            const div = document.createElement('div');
+            div.className = `card bg-white border-2 border-slate-200 rounded-xl p-3 md:p-4 text-center cursor-pointer shadow-sm text-base md:text-lg text-slate-700 relative z-10`;
+            
+            if (columnType === 'A') {
+                // Render Math with KaTeX in display mode for better fraction layout
+                div.innerHTML = katex.renderToString(content, {
+                    throwOnError: false,
+                    displayMode: true 
+                });
+            } else {
+                div.textContent = content;
+                div.classList.add('font-medium');
+            }
+
+            div.dataset.id = id;
+            div.dataset.col = columnType;
+
+            div.addEventListener('click', () => handleCardClick(id, columnType, div));
+            return div;
+        }
+
+        function handleCardClick(id, columnType, element) {
+            if (isProcessing || element.classList.contains('disabled') || element.classList.contains('matched')) {
+                return;
+            }
+
+            // Deselect logic
+            if (columnType === 'A' && selectedA && selectedA.id === id) {
+                element.classList.remove('selected');
+                selectedA = null;
+                return;
+            }
+            if (columnType === 'B' && selectedB && selectedB.id === id) {
+                element.classList.remove('selected');
+                selectedB = null;
+                return;
+            }
+
+            // Select logic
+            if (columnType === 'A') {
+                if (selectedA) selectedA.element.classList.remove('selected');
+                selectedA = { id, element };
+                element.classList.add('selected');
+            } else if (columnType === 'B') {
+                if (selectedB) selectedB.element.classList.remove('selected');
+                selectedB = { id, element };
+                element.classList.add('selected');
+            }
+
+            // Check match if both selected
+            if (selectedA && selectedB) {
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            isProcessing = true;
+            const isMatch = (selectedA.id === selectedB.id);
+
+            if (isMatch) {
+                score += 10;
+                matchesFound++;
+                
+                selectedA.element.classList.remove('selected');
+                selectedB.element.classList.remove('selected');
+                
+                selectedA.element.classList.add('matched', 'success-pop');
+                selectedB.element.classList.add('matched', 'success-pop');
+
+                selectedA = null;
+                selectedB = null;
+                updateScoreUI();
+                
+                isProcessing = false;
+
+                if (matchesFound === TOTAL_PAIRS) {
+                    setTimeout(endGame, 600);
+                }
+
+            } else {
+                score -= 5;
+                mistakes++;
+                
+                selectedA.element.classList.add('error-shake');
+                selectedB.element.classList.add('error-shake');
+
+                setTimeout(() => {
+                    selectedA.element.classList.remove('selected', 'error-shake');
+                    selectedB.element.classList.remove('selected', 'error-shake');
+                    selectedA = null;
+                    selectedB = null;
+                    updateScoreUI();
+                    isProcessing = false;
+                }, 500);
+            }
+        }
+
+        function updateScoreUI() {
+            scoreDisplay.textContent = score;
+            mistakeDisplay.textContent = mistakes;
+        }
+
+        function getRank(finalScore) {
+            if (finalScore >= 100) return { title: "Master Mathematician", color: "text-purple-600" };
+            if (finalScore >= 60) return { title: "Algebra Adept", color: "text-blue-600" };
+            if (finalScore >= 30) return { title: "Equation Explorer", color: "text-teal-600" };
+            return { title: "Rookie Number Cruncher", color: "text-slate-500" };
+        }
+
+        function endGame() {
+            const perfectBonusBadge = document.getElementById('perfectBonusBadge');
+            if (mistakes === 0) {
+                score += 20;
+                perfectBonusBadge.classList.remove('hidden');
+            } else {
+                perfectBonusBadge.classList.add('hidden');
+            }
+
+            if(score > 100) score = 100;
+            
+            document.getElementById('finalScore').textContent = score;
+            
+            const rank = getRank(score);
+            const rankEl = document.getElementById('finalRank');
+            rankEl.textContent = rank.title;
+            rankEl.className = `text-2xl font-bold ${rank.color}`;
+
+            gameOverModal.classList.remove('hidden');
+            setTimeout(() => {
+                gameOverModal.classList.remove('opacity-0');
+                gameOverModal.querySelector('div').classList.remove('scale-95');
+                gameOverModal.querySelector('div').classList.add('scale-100');
+            }, 10);
+        }
+
+        function hideModal() {
+            gameOverModal.classList.add('opacity-0');
+            gameOverModal.querySelector('div').classList.add('scale-95');
+            gameOverModal.querySelector('div').classList.remove('scale-100');
+            setTimeout(() => {
+                gameOverModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // Start game on load
+        window.addEventListener('DOMContentLoaded', () => {
+            initGame();
+        });
+    </script>
+</body>
+</html>
